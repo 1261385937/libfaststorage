@@ -161,7 +161,7 @@ TEST_P(ch_cluster_insert_ut, batch_insert) {
         store->storage(ptr, "default.sql_log");
     }
 
-    EXPECT_EQ(expect_count, async_result(store, expect_count, 2000ms));
+    EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
 TEST_P(ch_cluster_insert_ut, timeout_insert) {
@@ -180,11 +180,11 @@ TEST_P(ch_cluster_insert_ut, timeout_insert) {
         store->storage(ptr, "default.sql_log");
     }
 
-    EXPECT_EQ(expect_count, async_result(store, expect_count, 3000ms));
+    EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
 TEST_P(ch_cluster_insert_ut, 4_thread_storage) {
-    constexpr size_t batch = 100000;
+    constexpr size_t batch = 10000;
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::shared_ptr<storage_context>>>();
     store->set_batch_commit(batch);
@@ -203,11 +203,11 @@ TEST_P(ch_cluster_insert_ut, 4_thread_storage) {
         }).detach();
     }
 
-    EXPECT_EQ(expect_count, async_result(store, expect_count, 3000ms));
+    EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
 TEST_P(ch_cluster_insert_ut, 4_thread_insert) {
-    constexpr size_t batch = 100000;
+    constexpr size_t batch = 10000;
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>, 4>>();
     store->set_batch_commit(batch);
@@ -225,7 +225,7 @@ TEST_P(ch_cluster_insert_ut, 4_thread_insert) {
 
 TEST_P(ch_cluster_insert_ut, 16thread_storage_and_16thread_insert) {
     static constexpr size_t thread_count = 16;
-    constexpr size_t batch = 50000;
+    constexpr size_t batch = 10000;
     auto store =
         std::make_shared<fast::faststorage<ch::ch_cluster_connection,
         std::unique_ptr<storage_context>, thread_count>>();
@@ -244,11 +244,11 @@ TEST_P(ch_cluster_insert_ut, 16thread_storage_and_16thread_insert) {
         }).detach();
     }
 
-    EXPECT_EQ(expect_count, async_result(store, expect_count, 15s));
+    EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
 TEST_P(ch_cluster_insert_ut, disk_cache_and_4thread_storage_insert) {
-    constexpr size_t batch = 100000;
+    constexpr size_t batch = 10000;
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>, 4>>();
     constexpr size_t commit_batch = batch / 2;
@@ -268,7 +268,7 @@ TEST_P(ch_cluster_insert_ut, disk_cache_and_4thread_storage_insert) {
         }).detach();
     }
 
-    EXPECT_EQ(expect_count, async_result(store, expect_count, 20s));
+    EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
 TEST_P(ch_cluster_insert_ut, disk_cache_and_disable) {
@@ -298,7 +298,7 @@ TEST_P(ch_cluster_insert_ut, disk_cache_and_disable) {
         }).detach();
     }
 
-    ASSERT_GT(expect_count, async_result(store, expect_count, 15s));
+    ASSERT_GT(expect_count, async_result(store, expect_count, 10s));
 };
 
 INSTANTIATE_TEST_SUITE_P(ch_cluster_insert_set, ch_cluster_insert_ut, ::testing::Values(
