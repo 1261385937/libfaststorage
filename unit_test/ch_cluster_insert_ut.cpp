@@ -230,6 +230,7 @@ TEST_P(ch_cluster_insert_ut, 8thread_storage_and_8thread_insert) {
         std::make_shared<fast::faststorage<ch::ch_cluster_connection,
         std::unique_ptr<storage_context>, thread_count>>();
     store->set_batch_commit(batch);
+    store->set_timeout_commit(3000);
 
     store->init_storage(GetParam());
     store->reserve_block(batch, 5, 3);
