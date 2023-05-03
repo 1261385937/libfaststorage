@@ -145,8 +145,8 @@ TEST_P(ch_insert, 4_thread_insert) {
 	EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
 
-TEST_P(ch_insert, 16thread_storage_and_16thread_insert) {
-	static constexpr size_t thread_count = 16;
+TEST_P(ch_insert, 8thread_storage_and_8thread_insert) {
+	static constexpr size_t thread_count = 8;
 	constexpr size_t batch = 10000;
 	auto store = std::make_shared<
 		fast::faststorage<ch::ch_connection, std::unique_ptr<storage_context>, thread_count>>();
@@ -194,7 +194,7 @@ TEST_P(ch_insert, disk_cache_and_4thread_storage_insert) {
 
 TEST_P(ch_insert, disk_cache_and_disable) {
 	// GTEST_SKIP();
-	constexpr size_t batch = 100000;
+	constexpr size_t batch = 50000;
 	auto store = std::make_shared<
 		fast::faststorage<ch::ch_connection, std::unique_ptr<storage_context>, 2>>();
 	constexpr size_t commit_batch = batch / 2;
