@@ -1,0 +1,131 @@
+version: '3.3'
+
+services:
+  
+  zookeeper:
+    image: zookeeper:3.6.3
+    hostname: zk
+    container_name: clickhouse-zk
+    networks:
+      clickhouse-cluster:
+        ipv4_address: 172.18.0.2
+
+  clickhouse1:
+    image: clickhouse:22.8.9.24
+    user: clickhouse:clickhouse
+    hostname: ch1
+    container_name: clickhouse1
+    networks:
+      clickhouse-cluster:
+        ipv4_address: 172.18.0.3
+    extra_hosts:
+      - "zk:172.18.0.2"
+      - "ch2:172.18.0.4"
+      - "ch3:172.18.0.5"
+      - "ch4:172.18.0.6"
+    volumes:
+      - type: bind
+        source: ./config.xml
+        target: /etc/clickhouse-server/config.xml
+      - type: bind
+        source: ./users.xml
+        target: /etc/clickhouse-server/users.xml
+
+      - type: bind
+        source: ./ch1/metrika.xml
+        target: /etc/clickhouse-server/config.d/metrika.xml
+
+    depends_on:
+      - "zookeeper"
+
+  clickhouse2:
+    image: clickhouse:22.8.9.24
+    user: clickhouse:clickhouse
+    hostname: ch2
+    container_name: clickhouse2
+    networks:
+      clickhouse-cluster:
+        ipv4_address: 172.18.0.4
+    extra_hosts:
+      - "zk:172.18.0.2"
+      - "ch1:172.18.0.3"
+      - "ch3:172.18.0.5"
+      - "ch4:172.18.0.6"
+    volumes:
+      - type: bind
+        source: ./config.xml
+        target: /etc/clickhouse-server/config.xml
+      - type: bind
+        source: ./users.xml
+        target: /etc/clickhouse-server/users.xml
+
+      - type: bind
+        source: ./ch2/metrika.xml
+        target: /etc/clickhouse-server/config.d/metrika.xml
+     
+    depends_on:
+      - "zookeeper"
+
+  clickhouse3:
+    image: clickhouse:22.8.9.24
+    user: clickhouse:clickhouse
+    hostname: ch3
+    container_name: clickhouse3
+    networks:
+      clickhouse-cluster:
+        ipv4_address: 172.18.0.5
+    extra_hosts:
+      - "zk:172.18.0.2"
+      - "ch1:172.18.0.3"
+      - "ch2:172.18.0.4"
+      - "ch4:172.18.0.6"
+    volumes:
+      - type: bind
+        source: ./config.xml
+        target: /etc/clickhouse-server/config.xml
+      - type: bind
+        source: ./users.xml
+        target: /etc/clickhouse-server/users.xml
+
+      - type: bind
+        source: ./ch3/metrika.xml
+        target: /etc/clickhouse-server/config.d/metrika.xml
+
+    depends_on:
+      - "zookeeper"
+  
+  clickhouse4:
+    image: clickhouse:22.8.9.24
+    user: clickhouse:clickhouse
+    hostname: ch4
+    container_name: clickhouse4
+    networks:
+      clickhouse-cluster:
+        ipv4_address: 172.18.0.6
+    extra_hosts:
+      - "zk:172.18.0.2"
+      - "ch1:172.18.0.3"
+      - "ch2:172.18.0.4"
+      - "ch3:172.18.0.5"
+    volumes:
+      - type: bind
+        source: ./config.xml
+        target: /etc/clickhouse-server/config.xml
+      - type: bind
+        source: ./users.xml
+        target: /etc/clickhouse-server/users.xml
+
+      - type: bind
+        source: ./ch4/metrika.xml
+        target: /etc/clickhouse-server/config.d/metrika.xml
+        
+    depends_on:
+      - "zookeeper"
+
+networks:
+  clickhouse-cluster:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.1.0/16

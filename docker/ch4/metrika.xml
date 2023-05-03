@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+
+<yandex>
+
+<clickhouse_remote_servers>
+  <cluster_test>
+    <!-- 数据分片1 -->
+    <shard>
+      <weight>1</weight>
+      <!-- Optional. Whether to write data to just one of the replicas. Default: false (write data to all replicas). -->
+      <internal_replication>true</internal_replication>
+      <replica>
+        <host>ch1</host>
+        <port>9000</port>
+      </replica>
+      <replica>
+         <host>ch2</host>
+         <port>9000</port>
+      </replica>
+
+    </shard>
+    <!-- 数据分片2 -->
+    <shard>
+      <weight>1</weight>
+      <internal_replication>true</internal_replication>
+      <replica>
+        <host>ch3</host>
+        <port>9000</port>
+      </replica>
+      <replica>
+        <host>ch4</host>
+        <port>9000</port>
+      </replica>
+
+    </shard>
+  </cluster_test>
+
+</clickhouse_remote_servers>
+
+<zookeeper-servers>
+  <node index="1">
+    <host>zk</host>
+    <port>2181</port>
+  </node>
+</zookeeper-servers>
+
+<macros>
+  <cluster>cluster_test</cluster>
+  <shard>02</shard>
+  <replica>ch4</replica>
+</macros>
+
+</yandex>
