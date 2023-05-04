@@ -8,11 +8,13 @@ OPTION (BUILD_BENCHMARK "Build benchmark" OFF)
 OPTION (BUILD_TESTS "Build tests" OFF)
 OPTION (WITH_OPENSSL "Use OpenSSL for TLS connections" OFF)
 
-set(CMAKE_C_FLAGS_DEBUG  "${CMAKE_C_FLAGS_DEBUG} -Wno-conversion")
-set(CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -Wno-conversion")
+if (NOT MSVC)
+    set(CMAKE_C_FLAGS_DEBUG  "${CMAKE_C_FLAGS_DEBUG} -Wno-conversion")
+    set(CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -Wno-conversion")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-conversion")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-conversion") 
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-conversion")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-conversion") 
+endif()
 
 PROJECT (CLICKHOUSE-CLIENT)
 
