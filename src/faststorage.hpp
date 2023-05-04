@@ -21,14 +21,6 @@ namespace sqlcpp::ch::inner {
 struct clickhouse_tag;
 }
 
-template <typename T, class U = void>
-struct has_update_servers : std::false_type {};
-template <typename T>
-struct has_update_servers<T, std::enable_if_t<std::is_member_function_pointer_v<decltype(&T::FUN)>>>
-	: std::true_type {};
-template <class T>
-constexpr bool has_update_servers_v = has_update_servers<T>::value;
-
 namespace fast {
 /**
  * @brief Parallel-insert is 1 thread by default. Set it to be greater than 1 if

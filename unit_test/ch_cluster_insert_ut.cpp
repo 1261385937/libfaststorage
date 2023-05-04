@@ -35,10 +35,10 @@ protected:
     }
 
     template <typename Store>
-    auto async_result(Store&& store, size_t expect_value, std::chrono::milliseconds timeout) {
+    auto async_result(Store&& store, size_t expect_value, std::chrono::nanoseconds timeout) {
         auto fu = std::async([this, &store, &expect_value]() {
             while (run_) {
-                std::this_thread::sleep_for(1ms);
+                std::this_thread::sleep_for(1us);
                 if (store->storage_statistics().success == expect_value) {
                     break;
                 }
