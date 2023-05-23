@@ -314,7 +314,7 @@ private:
 			}
 			else {
 				failed_item_ += size;
-				printf("failed_item_:%llu", failed_item_.load());
+				printf("failed_item_:%llu\n", failed_item_.load());
 			}
 		}
 	};
