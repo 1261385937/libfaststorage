@@ -70,7 +70,7 @@ public:
 		}
 
 		// max attempt 3 times if insert failed
-		for (int i = 0; i < 3; ++i) {
+		for (int i = 0; i < 4; ++i) {
 			try {
 				client_->Insert(db_table, block);
 				return true;
