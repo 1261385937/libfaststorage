@@ -99,6 +99,15 @@ struct type_mapping<std::string> {
 };
 
 template <>
+struct type_mapping<std::string_view> {
+	using ch_type = clickhouse::ColumnString;
+	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnString>;
+	auto make_column(size_t count, size_t, size_t) {
+		return std::make_shared<clickhouse::ColumnString>(count);
+	}
+};
+
+template <>
 struct type_mapping<date_time> {
 	using ch_type = clickhouse::ColumnDateTime;
 	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnDateTime>;
