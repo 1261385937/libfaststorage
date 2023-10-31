@@ -302,7 +302,7 @@ private:
 			auto ok = engine->insert(std::move(queue), dest);
 			if (ok) {
 				successful_item_ += size;
-				printf("successful_item_:%llu\n", size);
+				//printf("successful_item_:%llu\n", size);
 			}
 			else {
 				failed_item_ += size;
