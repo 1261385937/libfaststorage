@@ -22,9 +22,9 @@ public:
 
 private:
 	std::unique_ptr<clickhouse::Client> client_;
-	std::atomic<size_t> count_ = 200000;
-	std::atomic<size_t> row_ = 5;
-	std::atomic<size_t> column_ = 5;
+	std::atomic<size_t> count_ = 0;
+	std::atomic<size_t> row_ = 0;
+	std::atomic<size_t> column_ = 0;
 
 public:
 	ch_connection(const std::string& ip, uint16_t port, const std::string& user,
