@@ -108,10 +108,16 @@ private:
 	auto gen_ch_block(DataType&& data) {
 		constexpr auto names = Type::elements_name();
 		constexpr auto address = Type::elements_address();
-		auto column_tup = std::apply([this](auto&&... args) {
+		constexpr auto element_size = Type::args_size_t::value;
+		thread_local auto column_tup = std::apply([this](auto&&... args) {
 			return std::make_tuple(inner::type_mapping < std::decay_t<decltype(Type{}.*args) >> {}.
 								   make_column(count_, row_, column_)...);
 		}, address);
+
+		for_each_tuple([](auto index) {
+			auto& column_ptr = std::get<index>(column_tup);
+			column_ptr->Clear();
+		}, std::make_index_sequence<element_size>());
 
 		using value_type = typename std::decay_t<DataType>::value_type;
 		constexpr auto is_smartptr = reflection::is_std_smartptr_v<value_type>;
@@ -125,9 +131,8 @@ private:
 			}
 		}
 
-		constexpr auto element_size = std::tuple_size_v<decltype(names)>;
 		clickhouse::Block block;
-		for_each_tuple([&names, &block, &column_tup](auto index) {
+		for_each_tuple([&names, &block](auto index) {
 			block.AppendColumn(std::string(std::get<index>(names)), std::get<index>(column_tup));
 		}, std::make_index_sequence<element_size>());
 		return block;

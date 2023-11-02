@@ -47,9 +47,9 @@ private:
     std::vector<shard_conn> shard_conns_;
     std::shared_mutex shard_conns_mtx_;
 
-    std::atomic<size_t> count_ = 200000;
-    std::atomic<size_t> row_ = 5;
-    std::atomic<size_t> column_ = 5;
+    std::atomic<size_t> count_ = 0;
+    std::atomic<size_t> row_ = 0;
+    std::atomic<size_t> column_ = 0;
 
 public:
     /**
