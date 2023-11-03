@@ -1,31 +1,13 @@
 #pragma once
 #include <algorithm>
 #include <atomic>
-#include <set>
 #include <shared_mutex>
 #include <vector>
 
+#include "ch_cluster.hpp"
 #include "ch_connection.hpp"
 
 namespace sqlcpp::ch {
-
-namespace cluster {
-struct ch_replica {
-    std::string ip;
-    uint16_t port = 9000;
-    std::string user = "";
-    std::string passwd = "";
-    // higher priority with smaller number
-    uint32_t priority = 1;
-    bool operator<(const ch_replica& c) const {
-        return this->priority < c.priority;
-    }
-};
-struct ch_shard {
-    std::multiset<ch_replica> replicas;
-    uint32_t weight = 1;
-};
-}  // namespace cluster
 
 /**
  * @brief Each shard just has one connection which connect to the lowest
@@ -36,10 +18,11 @@ public:
     using engine_type = inner::clickhouse_tag;
 
     struct shard_conn {
-        std::shared_ptr<ch_connection> conn;
-        uint64_t handled_count;
-        cluster::ch_shard shard;
+        cluster::ch_shard shard; //original shard info
+
         int index = 0;  // for remove this shard
+        std::shared_ptr<ch_connection> conn;
+        uint64_t handled_count = 0;
     };
 
 private:
@@ -104,6 +87,8 @@ public:
     bool insert(DataType&& data, const std::string& db_table) {
         thread_local std::atomic<uint64_t> info_version = 0;
         thread_local decltype(shard_conns_) now_shard_conns_;
+        thread_local size_t insert_times = 0; //every
+
         if (info_version != cluster_version_) {  // cluster change
             std::shared_lock shared_lock(shard_conns_mtx_);
             now_shard_conns_ = shard_conns_;
@@ -113,74 +98,77 @@ public:
 
         auto data_count = data.size();
         auto& sc = choose_shard_conn(now_shard_conns_);
-        // count_, row_, column_ may be changed
-        sc.conn->reserve_block(count_, row_, column_);
-        sc.handled_count += data_count;
-        if (sc.conn->insert(std::forward<DataType>(data), db_table)) {
-            // for test load_balance
-            /* printf("%s, %llu\n", sc.shard.replicas.begin()->ip.c_str(),
-                    sc.handled_count);*/
-            return true;
-        }
+        for (;;) {
+            if (sc.conn->insert(std::forward<DataType>(data), db_table)) {
+                sc.handled_count += data_count;
+                insert_times++;
+                return true;
+            }
 
-        // The replica node may be broken, so remove it.
-        // If this shard has no replica node, then remove the shard.
-        auto broken_replica_it = sc.shard.replicas.begin();
-        sc.shard.replicas.erase(broken_replica_it);
-        if (sc.shard.replicas.empty()) {
-            auto it = std::find_if(now_shard_conns_.begin(), now_shard_conns_.end(),
-                             [index = sc.index](const shard_conn& sc) { return index == sc.index; });
-            now_shard_conns_.erase(it);
-            return false;
+            // Try to get another replica connection with same shard
+            auto conn = make_shard_connection(sc.shard);
+            if (conn) {
+                sc.conn = std::move(conn);
+                continue;
+            }
+            if (sc.shard.replicas.empty()) {
+                // If this shard has no replica node, remove the shard.  
+                auto it = std::find_if(now_shard_conns_.begin(), now_shard_conns_.end(),
+                    [index = sc.index](const shard_conn& sc) { return index == sc.index; });
+                now_shard_conns_.erase(it);
+            }
+            
+            // Get the next shard connection, if no shard found, it will throw an exception.
+            sc = choose_shard_conn(now_shard_conns_);
         }
-        // Get another connection
-        auto conn = make_shard_connection(sc.shard);
-        if (!conn) {
-            return false;
-        }
-        sc.conn = std::move(conn);
-        return sc.conn->insert(std::forward<DataType>(data), db_table);
     }
 
 private:
     /**
-     * @brief Get a connection of minimum data replica node
+     * @brief Get a replica node connection by roundrobin.
      * @param shard_conns All shard connections
      * @return
      */
     shard_conn& choose_shard_conn(std::vector<shard_conn>& shard_conns) {
-        // Get a minimum data replica node, std::sort is not good here
+        if (shard_conns.empty()) { // All cluster node gone, almost impossble
+            throw std::runtime_error("All clickhouse node gone, can not get any connection");
+        }
+        
         auto it = std::min_element(shard_conns.begin(), shard_conns.end(),
-                                   [](const shard_conn& sc1, const shard_conn& sc2) {
+            [](const shard_conn& sc1, const shard_conn& sc2) {
             auto density1 = sc1.handled_count / sc1.shard.weight;
             auto density2 = sc2.handled_count / sc2.shard.weight;
             return density1 < density2;
         });
-        if (it == shard_conns.end()) {
-            // all cluster node gone, almost impossble
-            throw std::runtime_error("can not find cluster connection");
-        }
         return *it;
     }
 
     /**
      * @brief Do connection and remove broken replica node
+     * if continuous failed times reach max_connect_failed
      * @param shard A ch shard info
      * @return The health conn or nullptr if all replica node gone
      */
     std::shared_ptr<ch_connection> make_shard_connection(cluster::ch_shard& shard) {
-        while (!shard.replicas.empty()) {
-            // lowest priority
-            auto it = shard.replicas.begin();
+        for (auto it = shard.replicas.begin(); it != shard.replicas.end();) {
             try {
-                auto conn = std::make_shared<ch_connection>(
-                    (*it).ip, (*it).port, (*it).user, (*it).passwd);
+                auto conn = std::make_shared<ch_connection>(it->ip, it->port, it->user, it->passwd);
+                conn->reserve_block(count_, row_, column_);
+                it->continuous_connect_failed = 0;
                 return conn;
             }
             catch (const std::exception& e) {
-                printf("make ch connection failed: %s\n, remove the bad replica node(ip:%s, port:%d)",
-                    e.what(), (*it).ip.c_str(), (*it).port);
-                shard.replicas.erase(it);
+                it->continuous_connect_failed++;
+                if (it->continuous_connect_failed >= it->max_connect_failed) {
+                    // Continuous failed times reach max_connect_failed. Remove this replica.
+                    it = shard.replicas.erase(it);
+                }
+                else {
+                    ++it;
+                }
+
+                printf("make replica(ip:%s, port:%d) connection failed: %s\n",
+                    it->ip.c_str(), it->port, e.what());
             }
         }
         return {};

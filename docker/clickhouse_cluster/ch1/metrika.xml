@@ -16,6 +16,8 @@
       <replica>
          <host>ch2</host>
          <port>9000</port>
+         <user>default</user>
+         <password>okE7heh7</password>
       </replica>
 
     </shard>
@@ -26,10 +28,14 @@
       <replica>
         <host>ch3</host>
         <port>9000</port>
+        <user>default</user>
+        <password>okE7heh7</password>
       </replica>
       <replica>
         <host>ch4</host>
         <port>9000</port>
+        <user>default</user>
+        <password>okE7heh7</password>
       </replica>
 
     </shard>

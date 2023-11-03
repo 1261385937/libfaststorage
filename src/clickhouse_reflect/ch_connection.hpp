@@ -28,17 +28,20 @@ private:
 
 public:
 	ch_connection(const std::string& ip, uint16_t port, const std::string& user,
-				  const std::string& passwd)
+		const std::string& passwd)
 		: client_(std::make_unique<clickhouse::Client>(
-		clickhouse::ClientOptions()
-		.SetHost(ip)
-		.SetPort(port)
-		.SetUser(user)
-		.SetPassword(passwd)
-		.SetPingBeforeQuery(true)
-		.SetConnectionRecvTimeout(std::chrono::seconds(5))
-		.SetConnectionSendTimeout(std::chrono::seconds(5)))) {
-	}
+			clickhouse::ClientOptions()
+			.SetHost(ip)
+			.SetPort(port)
+			.SetUser(user)
+			.SetPassword(passwd)
+			.SetPingBeforeQuery(true)
+			.SetSendRetries(1)
+			.SetRetryTimeout(std::chrono::seconds(3))
+			.SetConnectionConnectTimeout(std::chrono::seconds(1))
+			.SetConnectionRecvTimeout(std::chrono::seconds(2))
+			.SetConnectionSendTimeout(std::chrono::seconds(3))))
+	{}
 
 	void reserve_block(size_t commit_count, size_t row, size_t column) {
 		count_ = commit_count;
@@ -69,18 +72,13 @@ public:
 			block = gen_ch_block<value_type>(std::forward<DataType>(data));
 		}
 
-		// max attempt 3 times if insert failed
-		for (int i = 0; i < 4; ++i) {
-			try {
-				client_->Insert(db_table, block);
-				return true;
-			}
-			catch (const std::exception& e) {
-				printf("insert failed:%s\n", e.what());
-				// consider network problem.
-				// do not need sleep, clickhouse already do it with
-				// SetPingBeforeQuery(true)
-			}
+		try {
+			//clickhouse detect network with SetPingBeforeQuery(true), if bad will reconnect.
+			client_->Insert(db_table, block);
+			return true;
+		}
+		catch (const std::exception& e) {
+			printf("insert failed:%s\n", e.what());
 		}
 		return false;
 	}
@@ -111,7 +109,7 @@ private:
 		constexpr auto element_size = Type::args_size_t::value;
 		thread_local auto column_tup = std::apply([this](auto&&... args) {
 			return std::make_tuple(inner::type_mapping < std::decay_t<decltype(Type{}.*args) >> {}.
-								   make_column(count_, row_, column_)...);
+				make_column(count_, row_, column_)...);
 		}, address);
 
 		for_each_tuple([](auto index) {

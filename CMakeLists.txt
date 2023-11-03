@@ -43,10 +43,10 @@ include_directories(${PROJECT_SOURCE_DIR}/3party/concurrentqueue-master)
 include_directories(${PROJECT_SOURCE_DIR}/3party/json-3.11.2/include)
 include_directories(${PROJECT_SOURCE_DIR}/3party/msgpack-4.1.3/include)
 
-include_directories(${PROJECT_SOURCE_DIR}/3party/clickhouse-cpp-2.3.0)
-include_directories(${PROJECT_SOURCE_DIR}/3party/clickhouse-cpp-2.3.0/contrib)
+include_directories(${PROJECT_SOURCE_DIR}/3party/clickhouse-cpp)
+include_directories(${PROJECT_SOURCE_DIR}/3party/clickhouse-cpp/contrib)
 
-add_subdirectory(3party/clickhouse-cpp-2.3.0)
+add_subdirectory(3party/clickhouse-cpp)
 add_subdirectory(3party/gtest-1.11.0)
 add_subdirectory(unit_test)
  

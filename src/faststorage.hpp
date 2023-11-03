@@ -104,9 +104,8 @@ public:
 	}
 
 	/**
-	 * @brief Indicate reserved memeory size for more efficient. Should call
-	 * after init_storage.
-	 *
+	 * @brief Indicate reserved memeory size for more efficient. Should call after init_storage.
+	 * This is a suggested setting, and the param will be adjusted by itself.
 	 * @tparam ...Args
 	 * @param ...args For clickhouse, the args is batch_commit, row and column
 	 */

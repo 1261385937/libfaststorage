@@ -10,7 +10,7 @@ if (MSVC)
         $<$<CXX_COMPILER_ID:MSVC>:/bigobj>
     )
 
-    target_link_libraries(${PROJECT_NAME} clickhouse-cpp-lib-static absl-lib cityhash-lib lz4-lib gtest-lib ws2_32)
+    target_link_libraries(${PROJECT_NAME} clickhouse-cpp-lib-static absl_int128 cityhash lz4 gtest-lib ws2_32)
 else ()
-    target_link_libraries(${PROJECT_NAME} clickhouse-cpp-lib-static absl-lib cityhash-lib lz4-lib gtest-lib -static-libgcc -static-libstdc++ dl pthread)
+    target_link_libraries(${PROJECT_NAME} clickhouse-cpp-lib-static absl_int128 cityhash lz4 gtest-lib -static-libgcc -static-libstdc++ dl pthread)
 endif ()
