@@ -106,13 +106,11 @@ TEST_P(ch_cluster_insert_ut, cluster_hot_rebuild) {
     auto new_info = std::vector<ch::cluster::ch_shard>{
         {std::multiset<ch::cluster::ch_replica>{
              ch::cluster::ch_replica{"172.18.0.3", (uint16_t)9000, "default", "", 2},
-             ch::cluster::ch_replica{"172.18.0.4", (uint16_t)9000, "default", "", 1}},
-         6},
+             ch::cluster::ch_replica{"172.18.0.4", (uint16_t)9000, "default", "", 1}}},
         {std::multiset<ch::cluster::ch_replica>{
              ch::cluster::ch_replica{"172.18.0.5", (uint16_t)9000, "default", "", 9},
              ch::cluster::ch_replica{"172.18.0.6", (uint16_t)9000, "default", "", 3},
-         },
-         4}
+         }}
     };
     std::thread([store, &new_info]() {
         std::this_thread::sleep_for(1500ms);
@@ -309,14 +307,12 @@ INSTANTIATE_TEST_SUITE_P(ch_cluster_insert_set, ch_cluster_insert_ut, ::testing:
         {
             { "172.18.0.3", (uint16_t)9000, "default", "", 1 },
             { "172.18.0.4", (uint16_t)9000, "default", "", 2 }
-        },
-            6
+        }
     },
     {
         {
             {"172.18.0.5", (uint16_t)9000, "default", "", 3},
             {"172.18.0.6", (uint16_t)9000, "default", "", 9},
-        },
-        4
+        }
     }
 }));

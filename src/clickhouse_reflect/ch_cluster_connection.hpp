@@ -23,6 +23,7 @@ public:
         int index = 0;  // for remove this shard
         std::shared_ptr<ch_connection> conn;
         uint64_t handled_count = 0;
+        float disk_usage = 0.0f;
     };
 
 private:
@@ -70,6 +71,7 @@ public:
                 index++;
             }
         }
+        update_shard_disk_usage(temp);
 
         std::unique_lock lock(shard_conns_mtx_);
         shard_conns_ = std::move(temp);
@@ -87,7 +89,7 @@ public:
     bool insert(DataType&& data, const std::string& db_table) {
         thread_local std::atomic<uint64_t> info_version = 0;
         thread_local decltype(shard_conns_) now_shard_conns_;
-        thread_local size_t insert_times = 0; //every
+        thread_local size_t insert_times = 0; //Check shard disk usage per 10000 times
 
         if (info_version != cluster_version_) {  // cluster change
             std::shared_lock shared_lock(shard_conns_mtx_);
@@ -95,12 +97,18 @@ public:
             shared_lock.unlock();
             info_version = cluster_version_.load();
         }
+        else if (insert_times % 10000 == 0) {
+            update_shard_disk_usage(now_shard_conns_);
+        }
 
-        auto data_count = data.size();
+        if (now_shard_conns_.empty()) {
+            return false;
+        }
         auto& sc = choose_shard_conn(now_shard_conns_);
+
         for (;;) {
             if (sc.conn->insert(std::forward<DataType>(data), db_table)) {
-                sc.handled_count += data_count;
+                sc.handled_count += data.size();
                 insert_times++;
                 return true;
             }
@@ -111,36 +119,38 @@ public:
                 sc.conn = std::move(conn);
                 continue;
             }
+
             if (sc.shard.replicas.empty()) {
                 // If this shard has no replica node, remove the shard.  
                 auto it = std::find_if(now_shard_conns_.begin(), now_shard_conns_.end(),
                     [index = sc.index](const shard_conn& sc) { return index == sc.index; });
                 now_shard_conns_.erase(it);
             }
-            
-            // Get the next shard connection, if no shard found, it will throw an exception.
+            if (now_shard_conns_.empty()) {
+                return false;
+            }
             sc = choose_shard_conn(now_shard_conns_);
         }
     }
 
 private:
     /**
-     * @brief Get a replica node connection by roundrobin.
-     * @param shard_conns All shard connections
+     * @brief Get a shard connection by roundrobin. 
+     * For one shard which has the lowest disk usage, it will be selected twice.
+     * @param shard_conns All shard connections, can not be empty
      * @return
      */
     shard_conn& choose_shard_conn(std::vector<shard_conn>& shard_conns) {
-        if (shard_conns.empty()) { // All cluster node gone, almost impossble
-            throw std::runtime_error("All clickhouse node gone, can not get any connection");
+        thread_local size_t pos = 0;
+        if (pos >= shard_conns.size()) {
+            //This is a compensation for one shard which has the least disk usage.
+            pos = 0;
+            return shard_conns[0];
         }
-        
-        auto it = std::min_element(shard_conns.begin(), shard_conns.end(),
-            [](const shard_conn& sc1, const shard_conn& sc2) {
-            auto density1 = sc1.handled_count / sc1.shard.weight;
-            auto density2 = sc2.handled_count / sc2.shard.weight;
-            return density1 < density2;
-        });
-        return *it;
+
+        auto& shard = shard_conns[pos];
+        pos++;
+        return shard;
     }
 
     /**
@@ -172,6 +182,35 @@ private:
             }
         }
         return {};
+    }
+
+    void update_shard_disk_usage(std::vector<shard_conn>& shard_conns) {
+        constexpr char disk_sql[] 
+            = "select free_space, total_space, keep_free_space from system.disks;";
+        for (auto& shard : shard_conns) {
+            try {
+                uint64_t free_space = 0;
+                uint64_t space = 0;
+                shard.conn->get_raw_conn()->Select(disk_sql,
+                    [&free_space, &space](const clickhouse::Block& block) {
+                    for (size_t i = 0; i < block.GetRowCount(); ++i) {
+                        free_space += (*block[0]->As<clickhouse::ColumnUInt64>())[i];
+                        auto total_space = (*block[1]->As<clickhouse::ColumnUInt64>())[i];
+                        auto keep_free_space = (*block[2]->As<clickhouse::ColumnUInt64>())[i];
+                        space += (total_space - keep_free_space);
+                    }
+                });
+                //Calculate entirety usage
+                shard.disk_usage = (space - free_space) * 1.0f / space;
+            }
+            catch (const std::exception& e) {
+                printf("check replica disk usage failed: %s\n", e.what());
+            }
+        }
+        std::sort(shard_conns.begin(), shard_conns.end(),
+            [](const shard_conn& shard1, const shard_conn& shard2) {
+            return shard1.disk_usage < shard2.disk_usage;
+        });
     }
 };
 
