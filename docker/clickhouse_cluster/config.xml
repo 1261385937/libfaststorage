@@ -682,7 +682,7 @@
         <replica>example01-01-1</replica>
     </macros>
     -->
-
+    <interserver_http_host>example.yandex.ru</interserver_http_host>
     <remote_servers incl="clickhouse_remote_servers" />
     <zookeeper incl="zookeeper-servers" optional="true" />
     <macros incl="macros" optional="true" />
