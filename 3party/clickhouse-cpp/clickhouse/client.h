@@ -19,6 +19,7 @@
 #include "columns/uuid.h"
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -39,9 +40,10 @@ struct ServerInfo {
 };
 
 /// Methods of block compression.
-enum class CompressionMethod {
-    None    = -1,
-    LZ4     =  1,
+enum class CompressionMethod : int8_t {
+    None = -1,
+    LZ4  = 1,
+    ZSTD = 2,
 };
 
 struct Endpoint {
@@ -219,6 +221,7 @@ struct ClientOptions {
 };
 
 std::ostream& operator<<(std::ostream& os, const ClientOptions& options);
+std::ostream& operator<<(std::ostream& os, const Endpoint& options);
 
 class SocketFactory;
 
@@ -266,6 +269,18 @@ public:
 
     // Try to connect to different endpoints one by one only one time. If it doesn't work, throw an exception.
     void ResetConnectionEndpoint();
+
+    struct Version
+    {
+        uint16_t major;
+        uint16_t minor;
+        uint16_t patch;
+        uint16_t build;
+        const char * extra;
+    };
+
+    static Version GetVersion();
+
 private:
     const ClientOptions options_;
 

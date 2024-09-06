@@ -60,7 +60,7 @@ private:
 };
 
 template <typename... Columns>
-class ColumnTupleT final : public ColumnTuple {
+class ColumnTupleT : public ColumnTuple {
 public:
     using TupleOfColumns = std::tuple<std::shared_ptr<Columns>...>;
 

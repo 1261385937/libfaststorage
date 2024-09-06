@@ -12,7 +12,7 @@ namespace clickhouse {
 /**
  * Represents dummy column of NULLs.
  */
-class ColumnNothing final : public Column {
+class ColumnNothing : public Column {
 public:
     ColumnNothing()
         : Column(Type::CreateNothing())

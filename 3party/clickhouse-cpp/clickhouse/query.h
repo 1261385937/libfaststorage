@@ -83,7 +83,7 @@ using ProfileEventsCallback    = std::function<bool(const Block& block)>;
 using ProfileCallbak           = std::function<void(const Profile& profile)>;
 
 
-class Query final : public QueryEvents {
+class Query : public QueryEvents {
 public:
      Query();
      Query(const char* query, const char* query_id = nullptr);

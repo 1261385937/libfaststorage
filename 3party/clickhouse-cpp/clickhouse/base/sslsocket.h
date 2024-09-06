@@ -46,7 +46,7 @@ private:
     std::unique_ptr<SSL_CTX, void (*)(SSL_CTX*)> context_;
 };
 
-class SSLSocket final : public Socket {
+class SSLSocket : public Socket {
 public:
     explicit SSLSocket(const NetworkAddress& addr, const SocketTimeoutParams& timeout_params,
                        const SSLParams& ssl_params, SSLContext& context);
@@ -65,7 +65,7 @@ private:
     std::unique_ptr<SSL, void (*)(SSL *s)> ssl_;
 };
 
-class SSLSocketFactory final : public NonSecureSocketFactory {
+class SSLSocketFactory : public NonSecureSocketFactory {
 public:
     explicit SSLSocketFactory(const ClientOptions& opts);
     ~SSLSocketFactory() override;
@@ -95,7 +95,7 @@ private:
     SSL *ssl_;
 };
 
-class SSLSocketOutput final : public OutputStream {
+class SSLSocketOutput : public OutputStream {
 public:
     explicit SSLSocketOutput(SSL *ssl);
     ~SSLSocketOutput() = default;

@@ -51,7 +51,7 @@ private:
 
 #if defined(_win_)
 
-class windowsErrorCategory final : public std::error_category {
+class windowsErrorCategory : public std::error_category {
 public:
     char const* name() const noexcept override final;
     std::string message(int c) const override final;
@@ -63,7 +63,7 @@ public:
 
 #if defined(_unix_)
 
-class getaddrinfoErrorCategory final : public std::error_category {
+class getaddrinfoErrorCategory : public std::error_category {
 public:
     char const* name() const noexcept override final;
     std::string message(int c) const override final;
@@ -145,7 +145,7 @@ protected:
 };
 
 
-class SocketInput final : public InputStream {
+class SocketInput : public InputStream {
 public:
     explicit SocketInput(SOCKET s);
     ~SocketInput();
@@ -158,7 +158,7 @@ private:
     SOCKET s_;
 };
 
-class SocketOutput final : public OutputStream {
+class SocketOutput : public OutputStream {
 public:
     explicit SocketOutput(SOCKET s);
     ~SocketOutput();

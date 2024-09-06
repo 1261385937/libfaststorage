@@ -10,7 +10,7 @@ namespace clickhouse {
 /**
  * Represents a UUID column.
  */
-class ColumnUUID final : public Column {
+class ColumnUUID : public Column {
 public:
     ColumnUUID();
 

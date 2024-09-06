@@ -8,7 +8,7 @@
 namespace clickhouse {
 
 /** */
-class ColumnDate final : public Column {
+class ColumnDate : public Column {
 public:
     using ValueType = std::time_t;
 
@@ -64,7 +64,7 @@ private:
 };
 
 
-class ColumnDate32 final : public Column {
+class ColumnDate32 : public Column {
 public:
     using ValueType = std::time_t;
 
@@ -123,7 +123,7 @@ private:
 
 
 /** DateTime64 supports date-time values (number of seconds since UNIX epoch), from 1970 up to 2130. */
-class ColumnDateTime final : public Column {
+class ColumnDateTime : public Column {
 public:
     using ValueType = std::time_t;
 
@@ -142,6 +142,7 @@ public:
 
     /// Append raw as UNIX epoch seconds in uint32
     void AppendRaw(uint32_t value);
+    uint32_t RawAt(size_t n) const;
 
     /// Timezone associated with a data column.
     std::string Timezone() const;
@@ -184,7 +185,7 @@ private:
 
 
 /** DateTime64 supports date-time values of arbitrary sub-second precision, from 1900 up to 2300. */
-class ColumnDateTime64 final : public Column {
+class ColumnDateTime64 : public Column {
 public:
     using ValueType = Int64;
 

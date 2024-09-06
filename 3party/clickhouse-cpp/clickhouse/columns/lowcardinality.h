@@ -117,7 +117,7 @@ public:
 /** Type-aware wrapper that provides simple convenience interface for accessing/appending individual items.
  */
 template <typename DictionaryColumnType>
-class ColumnLowCardinalityT final : public ColumnLowCardinality {
+class ColumnLowCardinalityT : public ColumnLowCardinality {
 
     DictionaryColumnType& typed_dictionary_;
     const Type::Code type_;

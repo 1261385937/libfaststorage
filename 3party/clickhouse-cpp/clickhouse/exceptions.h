@@ -11,34 +11,34 @@ class Error : public std::runtime_error {
 };
 
 // Caused by any user-related code, like invalid column types or arguments passed to any method.
-class ValidationError final : public Error {
+class ValidationError : public Error {
     using Error::Error;
 };
 
 // Buffers+IO errors, failure to serialize/deserialize, checksum mismatches, etc.
-class ProtocolError final : public Error {
+class ProtocolError : public Error {
     using Error::Error;
 };
 
-class UnimplementedError final : public Error {
+class UnimplementedError : public Error {
     using Error::Error;
 };
 
 // Internal validation error.
-class AssertionError final : public Error {
+class AssertionError : public Error {
     using Error::Error;
 };
 
-class OpenSSLError final : public Error {
+class OpenSSLError : public Error {
     using Error::Error;
 };
 
-class LZ4Error final : public Error {
+class CompressionError : public Error {
     using Error::Error;
 };
 
 // Exception received from server.
-class ServerException final : public Error {
+class ServerException : public Error {
 public:
     ServerException(std::unique_ptr<Exception> e)
         : Error(std::string())

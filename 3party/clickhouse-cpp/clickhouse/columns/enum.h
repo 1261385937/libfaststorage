@@ -6,7 +6,7 @@ namespace clickhouse {
 
 
 template <typename T>
-class ColumnEnum final : public Column {
+class ColumnEnum : public Column {
 public:
     using ValueType = T;
 

@@ -18,7 +18,7 @@ class EndpointsIteratorBase
    virtual Endpoint Next() = 0;
 };
 
-class RoundRobinEndpointsIterator final : public EndpointsIteratorBase
+class RoundRobinEndpointsIterator : public EndpointsIteratorBase
 {
  public:
     explicit RoundRobinEndpointsIterator(const std::vector<Endpoint>& opts);

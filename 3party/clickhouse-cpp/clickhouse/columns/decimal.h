@@ -8,7 +8,7 @@ namespace clickhouse {
 /**
  * Represents a column of decimal type.
  */
-class ColumnDecimal final : public Column {
+class ColumnDecimal : public Column {
 public:
     using ValueType = Int128;
 

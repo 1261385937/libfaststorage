@@ -69,7 +69,7 @@ private:
 };
 
 template <typename K, typename V>
-class ColumnMapT final : public ColumnMap {
+class ColumnMapT : public ColumnMap {
 public:
     using KeyColumnType   = K;
     using ValueColumnType = V;

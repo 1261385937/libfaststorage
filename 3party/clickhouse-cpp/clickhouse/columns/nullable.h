@@ -64,7 +64,7 @@ private:
 };
 
 template <typename ColumnType>
-class ColumnNullableT final : public ColumnNullable {
+class ColumnNullableT : public ColumnNullable {
 public:
     using NestedColumnType = ColumnType;
     using ValueType = std::optional<std::decay_t<decltype(std::declval<NestedColumnType>().At(0))>>;

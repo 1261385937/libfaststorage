@@ -8,7 +8,7 @@
 namespace clickhouse {
 
 template <typename NestedColumnType, Type::Code type_code>
-class ColumnGeo final : public Column {
+class ColumnGeo : public Column {
 public:
     using ValueType = typename NestedColumnType::ValueType;
 

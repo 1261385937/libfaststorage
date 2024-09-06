@@ -102,12 +102,18 @@ IF (WITH_OPENSSL)
     LIST(APPEND clickhouse-cpp-lib-src base/sslsocket.cpp)
 ENDIF ()
 
-ADD_LIBRARY (clickhouse-cpp-lib ${clickhouse-cpp-lib-src})
-SET_TARGET_PROPERTIES (clickhouse-cpp-lib PROPERTIES LINKER_LANGUAGE CXX)
+ADD_LIBRARY (clickhouse-cpp-lib ${clickhouse-cpp-lib-src}
+    version.h)
+SET_TARGET_PROPERTIES (clickhouse-cpp-lib
+    PROPERTIES
+    LINKER_LANGUAGE CXX
+    VERSION ${CLICKHOUSE_CPP_VERSION}
+)
 TARGET_LINK_LIBRARIES (clickhouse-cpp-lib
     absl::int128
     cityhash::cityhash
     lz4::lz4
+    zstd::zstd
 )
 TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
     PUBLIC ${PROJECT_SOURCE_DIR}
@@ -115,7 +121,13 @@ TARGET_INCLUDE_DIRECTORIES (clickhouse-cpp-lib
 
 IF (NOT BUILD_SHARED_LIBS)
     ADD_LIBRARY (clickhouse-cpp-lib-static ALIAS clickhouse-cpp-lib)
-ENDIF()
+ELSE ()
+    SET_TARGET_PROPERTIES (clickhouse-cpp-lib
+        PROPERTIES
+        SO_VERSION ${CLICKHOUSE_CPP_VERSION}
+        SO_VERSION ${CLICKHOUSE_CPP_VERSION_MAJOR}
+    )
+ENDIF ()
 
 
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -153,6 +165,7 @@ INSTALL(FILES exceptions.h DESTINATION include/clickhouse/)
 INSTALL(FILES server_exception.h DESTINATION include/clickhouse/)
 INSTALL(FILES protocol.h DESTINATION include/clickhouse/)
 INSTALL(FILES query.h DESTINATION include/clickhouse/)
+INSTALL(FILES version.h DESTINATION include/clickhouse/)
 
 # base
 INSTALL(FILES base/buffer.h DESTINATION include/clickhouse/base/)
