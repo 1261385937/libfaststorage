@@ -36,14 +36,14 @@ class faststorage {
 public:
 	using engine_type = typename StorageEngine::engine_type;
 	using storage_pair = std::pair<std::string, StorageType>;
-	using queue = moodycamel::ConcurrentQueue<storage_pair>;
+	using queue = moodycamel::ConcurrentQueue<StorageType>;
 
 	struct task_context {
 		std::thread thd;
 		std::unique_ptr<StorageEngine> engine;
 		std::condition_variable cv;
 		std::mutex mtx;  // just For cv
-		queue q;
+		std::unordered_map<std::string, queue> multi_q;
 		std::atomic<uint64_t> cached_count = 0;
 	};
 
@@ -152,7 +152,7 @@ public:
 	 */
 	void enable_disk_cache(std::string path) {
 		disk_cache_ = std::make_unique<typename decltype(disk_cache_)::element_type>(std::move(path));
-		disk_cache_->subscribe([this](auto&& data) { this->bulk_insert(data, engine_for_disk_); });
+		//disk_cache_->subscribe([this](auto&& data) { this->bulk_insert(data, engine_for_disk_); });
 	}
 
 	/**
@@ -211,11 +211,17 @@ public:
 
 		// dispatch storage
 		auto index = cur_index_.load();
-		auto& q = task_group_[index].q;
+		auto& multi_q = task_group_[index].multi_q;
 		auto& cached_count = task_group_[index].cached_count;
 		auto& cv = task_group_[index].cv;
 
-		q.enqueue(storage_pair{ std::forward<String>(dest), std::forward<Datatype>(data) });
+		auto it = multi_q.find(dest);
+		if (it != multi_q.end()) {
+			it->second.enqueue(std::forward<Datatype>(data));
+		}
+		else {
+			multi_q.emplace(std::forward<String>(dest), std::forward<Datatype>(data));
+		}
 		cached_count++;
 		if (cached_count >= batch_commit_.load()) {
 			cv.notify_one();
@@ -244,7 +250,7 @@ private:
 		prctl(PR_SET_NAME, "storage");
 #endif
 		auto& cv = task_group_[index].cv;
-		auto& q = task_group_[index].q;
+		auto& multi_q = task_group_[index].multi_q;
 		auto& mtx = task_group_[index].mtx;
 		auto& engine = task_group_[index].engine;
 		auto& cached_count = task_group_[index].cached_count;
@@ -258,44 +264,64 @@ private:
 			if (cached_count == 0) {
 				continue;
 			}
+			this->bulk_insert<false>(multi_q, engine, cached_count.load());
+			/*
 			auto count = cached_count.load();
 			std::vector<storage_pair> bulk;
 			bulk.resize(count);
 			auto size = q.try_dequeue_bulk(bulk.begin(), count);
-			this->bulk_insert(bulk, engine);
-			cached_count -= size;
+			this->bulk_insert<false>(bulk, engine, count);
+			cached_count -= size;*/
 		}
 
 		// for last data
 		if (cached_count > 0) {
 			auto count = cached_count.load();
-			std::vector<storage_pair> bulk;
-			bulk.resize(count);
-			q.try_dequeue_bulk(bulk.begin(), count);
-			this->bulk_insert(bulk, engine);
+			this->bulk_insert<false>(multi_q, engine, count);
 		}
 	}
 
-	template <typename Data, typename E>
-	void bulk_insert(Data&& data, E&& engine) {
+	template <bool DiskCache, typename Data, typename E>
+	bool bulk_insert(Data&& data, E&& engine, uint64_t bulk_count = 0) {
 		using single_queue = std::vector<StorageType>;
-		std::unordered_map<std::string, single_queue> mqueue;
-		for (auto& [dest, d] : data) {
-			auto it = mqueue.find(dest);
-			if (it != mqueue.end()) {
-				it->second.emplace_back(std::move(d));
-				continue;
-			}
-			single_queue queue;
-			queue.reserve(data.size());
-			queue.emplace_back(std::move(d));
-			mqueue.emplace(std::move(dest), std::move(queue));
+		std::unordered_map<std::string, single_queue> multi_queue;
+
+		if constexpr (DiskCache) {
+			/*for (auto& [dest, d] : data) {
+				auto it = multi_queue.find(dest);
+				if (it != multi_queue.end()) {
+					it->second.emplace_back(std::move(d));
+					continue;
+				}
+				single_queue queue;
+				queue.reserve(data.size());
+				queue.emplace_back(std::move(d));
+				multi_queue.emplace(std::move(dest), std::move(queue));
+			}*/
 		}
-		this->real_insert(std::move(mqueue), engine);
+		else {
+			/*for (auto&& [dest, q] : data) {
+				single_queue bulk;
+				bulk.resize(bulk_count);
+				q.try_dequeue_bulk(bulk.begin(), bulk_count);
+				multi_queue.emplace(std::move(dest), std::move(bulk));
+			}*/
+		}
+		
+
+		//for (auto&& [dest, queue] : multi_queue) {
+		//	auto size = queue.size();
+		//	auto ok = engine->insert(std::move(queue), dest);
+		//	if (ok) {
+		//		successful_item_ += size;
+		//		//printf("successful_item_:%llu\n", size);
+		//	}
+		//}
+		//return this->real_insert(std::move(mqueue), engine);
 	}
 
 	template <typename Q, typename E>
-	void real_insert(Q&& mq, E&& engine) {
+	bool real_insert(Q&& mq, E&& engine) {
 		for (auto& [dest, queue] : mq) {
 			auto size = queue.size();
 			auto ok = engine->insert(std::move(queue), dest);
@@ -303,11 +329,11 @@ private:
 				successful_item_ += size;
 				//printf("successful_item_:%llu\n", size);
 			}
-			else {
-				failed_item_ += size;
-				printf("failed_item_:%llu\n", failed_item_.load());
-			}
+			return false;
+			//failed_item_ += size;
+			//printf("failed_item_:%llu\n", failed_item_.load());
 		}
+		return true;
 	};
 };
 

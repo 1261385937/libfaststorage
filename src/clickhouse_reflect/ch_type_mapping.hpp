@@ -3,6 +3,7 @@
 #include "clickhouse/columns/array.h"
 #include "clickhouse/columns/numeric.h"
 #include "clickhouse/columns/string.h"
+#include "clickhouse/columns/date.h"
 #include "reflection/reflect_meta.hpp"
 #include "user_define_type.hpp"
 
