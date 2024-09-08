@@ -63,7 +63,7 @@ TEST_P(ch_insert, insert_performace) {
 	store->reserve_block(batch, 3, 3);
 	constexpr size_t expect_count = batch;
 	for (size_t i = 0; i < batch; ++i) {
-		store->storage(std::make_unique<storage_context>(), "default.sql_log");
+		store->storage(std::make_unique<storage_context>());
 	}
 	EXPECT_EQ(expect_count, async_result(store, expect_count, 5s));
 };
@@ -80,7 +80,7 @@ TEST_P(ch_insert, batch_insert) {
 	constexpr size_t expect_count = batch;
 	auto ptr = std::make_shared<storage_context>();
 	for (size_t i = 0; i < batch; ++i) {
-		store->storage(ptr, "default.sql_log");
+		store->storage(ptr);
 	}
 
 	EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -99,7 +99,7 @@ TEST_P(ch_insert, timeout_insert) {
 	constexpr size_t expect_count = batch / 2;
 	auto ptr = std::make_shared<storage_context>();
 	for (size_t i = 0; i < expect_count; ++i) {
-		store->storage(ptr, "default.sql_log");
+		store->storage(ptr);
 	}
 
 	EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -120,7 +120,7 @@ TEST_P(ch_insert, 4_thread_storage) {
 			constexpr size_t insert_count = expect_count / 4;
 			auto ptr = std::make_shared<storage_context>();
 			for (size_t i = 0; i < insert_count; ++i) {
-				store->storage(ptr, "default.sql_log");
+				store->storage(ptr);
 			}
 		}).detach();
 	}
@@ -139,7 +139,7 @@ TEST_P(ch_insert, 4_thread_insert) {
 
 	constexpr size_t expect_count = batch * 4;
 	for (size_t i = 0; i < expect_count; ++i) {
-		store->storage(std::make_unique<storage_context>(), "default.sql_log");
+		store->storage(std::make_unique<storage_context>());
 	}
 
 	EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -160,7 +160,7 @@ TEST_P(ch_insert, 8thread_storage_and_8thread_insert) {
 		std::thread([&store]() {
 			constexpr size_t insert_count = expect_count / thread_count;
 			for (size_t i = 0; i < insert_count; ++i) {
-				store->storage(std::make_unique<storage_context>(), "default.sql_log");
+				store->storage(std::make_unique<storage_context>());
 			}
 		}).detach();
 	}
@@ -184,7 +184,7 @@ TEST_P(ch_insert, disk_cache_and_4thread_storage_insert) {
 		std::thread([&store]() {
 			constexpr size_t insert_count = expect_count / 4;
 			for (size_t i = 0; i < insert_count; ++i) {
-				store->storage(std::make_unique<storage_context>(), "default.sql_log");
+				store->storage(std::make_unique<storage_context>());
 			}
 		}).detach();
 	}
@@ -214,7 +214,7 @@ TEST_P(ch_insert, disk_cache_and_disable) {
 		std::thread([&store]() {
 			constexpr size_t insert_count = expect_count / 4;
 			for (size_t i = 0; i < insert_count; ++i) {
-				store->storage(std::make_unique<storage_context>(), "default.sql_log");
+				store->storage(std::make_unique<storage_context>());
 			}
 		}).detach();
 	}

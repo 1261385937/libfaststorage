@@ -22,11 +22,17 @@ struct clickhouse_tag;
 }
 
 namespace fast {
+
+template<typename T>
+concept clickhouse_concept = std::is_same_v<
+	sqlcpp::ch::inner::clickhouse_tag, typename T::engine_type>;
+
+
 /**
  * @brief Parallel-insert is 1 thread by default. Set it to be greater than 1 if
  * you want parallel. Each parallel will has a connection.
  *
- * @tparam StorageEngine can be clickhouse, kafka etc.
+ * @tparam StorageEngine can be ch_connection, ch_cluster_connection etc.
  * @tparam StorageType is the type of inserted data.
  * @tparam Parallel is the insert-thread count.
  * different entry
@@ -36,7 +42,7 @@ class faststorage {
 public:
 	using engine_type = typename StorageEngine::engine_type;
 	using storage_pair = std::pair<std::string, StorageType>;
-	using queue = moodycamel::ConcurrentQueue<storage_pair>;
+	using queue = moodycamel::ConcurrentQueue<StorageType>;
 
 	struct task_context {
 		std::thread thd;
@@ -50,14 +56,16 @@ public:
 private:
 	std::atomic<uint64_t> batch_commit_{ 100000 };
 	std::atomic<uint32_t> timeout_commit_{ 5000 };
+	std::string dest_;
 
 	std::array<task_context, Parallel> task_group_;
 	std::atomic<bool> run_ = true;
 	std::atomic<uint16_t> cur_index_ = 0;
 
 	// for disk cache
-	std::unique_ptr<disk::disk_cache<storage_pair>> disk_cache_ = nullptr;
+	std::unique_ptr<disk::disk_cache<StorageType>> disk_cache_;
 	std::unique_ptr<StorageEngine> engine_for_disk_;
+	static constexpr int max_retry_ = 10;
 
 	// for statistics
 	std::atomic<uint64_t> total_item_{ 0 };
@@ -151,8 +159,13 @@ public:
 	 * @param path must be unique path for multi-process
 	 */
 	void enable_disk_cache(std::string path) {
+		if (disk_cache_) {
+			return;
+		}
 		disk_cache_ = std::make_unique<typename decltype(disk_cache_)::element_type>(std::move(path));
-		disk_cache_->subscribe([this](auto&& data) { this->bulk_insert(data, engine_for_disk_); });
+		disk_cache_->subscribe([this](auto&& data) {
+			this->bulk_insert<true>(data, engine_for_disk_);
+		});
 	}
 
 	/**
@@ -183,25 +196,23 @@ public:
 	 * @tparam String
 	 * @param data type should be same as StorageType, or comile error.
 	 * Smart-ptr is necessary for clickhouse.
-	 *
-	 * @param dest may be url, table or db.table
 	 */
-	template <typename Datatype, typename String>
-	void storage(Datatype&& data, String&& dest) {
+	template <typename Datatype> 
+		requires clickhouse_concept<StorageEngine>
+	void storage(Datatype&& data) {
 		if constexpr (!std::is_same_v<StorageType, std::decay_t<Datatype>>) {
 			static_assert(reflection::always_false_v<Datatype>, "Datatype not match StorageType");
 			using ch_tag = sqlcpp::ch::inner::clickhouse_tag;
 			if constexpr (std::is_same_v<engine_type, ch_tag>) {
 				static_assert(reflection::is_std_sharedptr_v<Datatype>,
-							  "clickhouse storage must use smart_ptr for high performance");
+					"clickhouse storage must use smart_ptr for high performance");
 			}
 		}
 
 		total_item_++;
 		if (!has_workable()) {
 			if (disk_cache_) {  // need disk cache
-				disk_cache_->produce(
-					storage_pair{ std::forward<String>(dest), std::forward<Datatype>(data) });
+				disk_cache_->produce(std::forward<Datatype>(data));
 			}
 			else {
 				drop_item_++;
@@ -215,7 +226,7 @@ public:
 		auto& cached_count = task_group_[index].cached_count;
 		auto& cv = task_group_[index].cv;
 
-		q.enqueue(storage_pair{ std::forward<String>(dest), std::forward<Datatype>(data) });
+		q.enqueue(std::forward<Datatype>(data));
 		cached_count++;
 		if (cached_count >= batch_commit_.load()) {
 			cv.notify_one();
@@ -254,61 +265,55 @@ private:
 				std::unique_lock lock(mtx);
 				cv.wait_for(lock, std::chrono::milliseconds(timeout_commit_.load()));
 			}
-
 			if (cached_count == 0) {
 				continue;
 			}
+
 			auto count = cached_count.load();
-			std::vector<storage_pair> bulk;
+			std::vector<StorageType> bulk;
 			bulk.resize(count);
 			auto size = q.try_dequeue_bulk(bulk.begin(), count);
-			this->bulk_insert(bulk, engine);
+			this->bulk_insert<false>(std::move(bulk), engine);
 			cached_count -= size;
 		}
 
 		// for last data
 		if (cached_count > 0) {
 			auto count = cached_count.load();
-			std::vector<storage_pair> bulk;
+			std::vector<StorageType> bulk;
 			bulk.resize(count);
 			q.try_dequeue_bulk(bulk.begin(), count);
-			this->bulk_insert(bulk, engine);
+			this->bulk_insert<false>(std::move(bulk), engine);
 		}
 	}
 
-	template <typename Data, typename E>
+	template <bool DiskCache, typename Data, typename E>
 	void bulk_insert(Data&& data, E&& engine) {
-		using single_queue = std::vector<StorageType>;
-		std::unordered_map<std::string, single_queue> mqueue;
-		for (auto& [dest, d] : data) {
-			auto it = mqueue.find(dest);
-			if (it != mqueue.end()) {
-				it->second.emplace_back(std::move(d));
-				continue;
+		auto size = data.size();
+		if constexpr (DiskCache) {
+			for (int i = 0; i < max_retry_; i++) {
+				auto ok = engine->insert(data, dest_);
+				if (ok) {
+					successful_item_ += size;
+					return;
+				}
+				std::this_thread::sleep_for(std::chrono::seconds(i + 1));
 			}
-			single_queue queue;
-			queue.reserve(data.size());
-			queue.emplace_back(std::move(d));
-			mqueue.emplace(std::move(dest), std::move(queue));
+			failed_item_ += size;
 		}
-		this->real_insert(std::move(mqueue), engine);
-	}
-
-	template <typename Q, typename E>
-	void real_insert(Q&& mq, E&& engine) {
-		for (auto& [dest, queue] : mq) {
-			auto size = queue.size();
-			auto ok = engine->insert(std::move(queue), dest);
+		else {	
+			auto ok = engine->insert(data, dest_);
 			if (ok) {
 				successful_item_ += size;
-				//printf("successful_item_:%llu\n", size);
+				return;
 			}
-			else {
-				failed_item_ += size;
-				printf("failed_item_:%llu\n", failed_item_.load());
+			if (disk_cache_) {
+				disk_cache_->produce(std::move(data));
+				return;
 			}
+			failed_item_ += size;
 		}
-	};
+	}
 };
 
 }  // namespace fast

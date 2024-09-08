@@ -15,6 +15,16 @@
 
 namespace disk {
 
+template<typename T>
+concept sequence_container = requires (T t, std::size_t n) {
+	{ t.begin() } ->std::convertible_to<decltype(t.begin())>;
+	{ t.end() } ->std::convertible_to<decltype(t.end())>;
+	{ t.resize(n) } ->std::same_as<void>;
+};
+
+template<typename T>
+concept not_sequence_container = !sequence_container<T>;
+
 template <typename T, typename U = void>
 struct has_size : std::false_type {};
 template <typename T>
@@ -88,6 +98,7 @@ public:
 	}
 
 	template <typename T>
+		requires not_sequence_container<T>
 	void produce(T&& cache) {
 		std::lock_guard lock(caches_mtx_);
 		caches_.emplace_back(std::forward<T>(cache));
@@ -98,6 +109,30 @@ public:
 	void produce(T&& cache, size_t size) {
 		std::lock_guard lock(caches_mtx_);
 		caches_.emplace_back(std::forward<T>(cache));
+		caches_count_ += size;
+	}
+
+	//template <typename T>
+	//void produce(std::vector<T> cache) {
+	//	/*std::lock_guard lock(caches_mtx_);
+	//	caches_.emplace_back(std::forward<T>(cache));
+	//	caches_count_ += size;*/
+	//}
+
+	template<typename T> 
+		requires sequence_container<T>
+	void produce(T&& cache) {
+		constexpr auto rvalue = std::is_rvalue_reference_v<decltype(cache)>;
+		auto size = cache.size();
+
+		std::lock_guard lock(caches_mtx_);
+		if constexpr (rvalue) {
+			caches_.insert(caches_.end(),
+				std::make_move_iterator(cache.begin()), std::make_move_iterator(cache.end()));
+		}
+		else {
+			caches_.insert(caches_.end(), cache.begin(), cache.end());
+		}
 		caches_count_ += size;
 	}
 

@@ -1,5 +1,4 @@
 #pragma once
-#include "clickhouse/columns/date.h"
 #include "meta_describe.hpp"
 
 namespace sqlcpp::ch {
