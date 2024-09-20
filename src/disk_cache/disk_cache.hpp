@@ -112,13 +112,6 @@ public:
 		caches_count_ += size;
 	}
 
-	//template <typename T>
-	//void produce(std::vector<T> cache) {
-	//	/*std::lock_guard lock(caches_mtx_);
-	//	caches_.emplace_back(std::forward<T>(cache));
-	//	caches_count_ += size;*/
-	//}
-
 	template<typename T> 
 		requires sequence_container<T>
 	void produce(T&& cache) {
