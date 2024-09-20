@@ -99,6 +99,14 @@ public:
 	}
 
 	/**
+	 * @brief
+	 * @param dest Table. Ex: default.sql_log
+	 */
+	void set_insert_destination(std::string_view dest) {
+		dest_ = dest;
+	}
+
+	/**
 	 * @brief If servers change, need to rebuild the connections
 	 * @tparam ...Args
 	 * @param ...args New servers info
@@ -109,23 +117,6 @@ public:
 			task_group_[i].engine->update_servers(args...);
 		}
 		engine_for_disk_->update_servers(std::forward<Args>(args)...);
-	}
-
-	/**
-	 * @brief Indicate reserved memeory size for more efficient. Should call after init_storage.
-	 * This is a suggested setting, and the param will be adjusted by itself.
-	 * @tparam ...Args
-	 * @param ...args For clickhouse, the args is batch_commit, row and column
-	 */
-	template <typename... Args>
-	void reserve_block(Args &&...args) {
-		using ch_tag = sqlcpp::ch::inner::clickhouse_tag;
-		if constexpr (std::is_same_v<engine_type, ch_tag>) {
-			for (size_t i = 0; i < Parallel; ++i) {
-				task_group_[i].engine->reserve_block(args...);
-			}
-			engine_for_disk_->reserve_block(std::forward<Args>(args)...);
-		}
 	}
 
 	/**
@@ -164,7 +155,7 @@ public:
 		}
 		disk_cache_ = std::make_unique<typename decltype(disk_cache_)::element_type>(std::move(path));
 		disk_cache_->subscribe([this](auto&& data) {
-			this->bulk_insert<true>(data, engine_for_disk_);
+			this->bulk_insert<true>(std::move(data), engine_for_disk_);
 		});
 	}
 
