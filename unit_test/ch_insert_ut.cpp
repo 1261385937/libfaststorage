@@ -60,7 +60,7 @@ TEST_P(ch_insert, insert_performace) {
 	store->set_timeout_commit(10000);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 3, 3);
+	store->set_insert_destination("default.sql_log");
 	constexpr size_t expect_count = batch;
 	for (size_t i = 0; i < batch; ++i) {
 		store->storage(std::make_unique<storage_context>());
@@ -75,7 +75,7 @@ TEST_P(ch_insert, batch_insert) {
 	store->set_batch_commit(batch);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	constexpr size_t expect_count = batch;
 	auto ptr = std::make_shared<storage_context>();
@@ -94,7 +94,7 @@ TEST_P(ch_insert, timeout_insert) {
 	store->set_timeout_commit(1000);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	constexpr size_t expect_count = batch / 2;
 	auto ptr = std::make_shared<storage_context>();
@@ -112,7 +112,7 @@ TEST_P(ch_insert, 4_thread_storage) {
 	store->set_batch_commit(batch);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	static constexpr size_t expect_count = batch;
 	for (size_t i = 0; i < 4; ++i) {
@@ -135,7 +135,7 @@ TEST_P(ch_insert, 4_thread_insert) {
 	store->set_batch_commit(batch);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	constexpr size_t expect_count = batch * 4;
 	for (size_t i = 0; i < expect_count; ++i) {
@@ -153,7 +153,7 @@ TEST_P(ch_insert, 8thread_storage_and_8thread_insert) {
 	store->set_batch_commit(batch);
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	static constexpr size_t expect_count = batch * thread_count;
 	for (size_t i = 0; i < thread_count; ++i) {
@@ -177,7 +177,7 @@ TEST_P(ch_insert, disk_cache_and_4thread_storage_insert) {
 	store->enable_disk_cache("./disk_cache/");
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	static constexpr size_t expect_count = batch * 4;
 	for (size_t i = 0; i < 4; ++i) {
@@ -202,7 +202,7 @@ TEST_P(ch_insert, disk_cache_and_disable) {
 	store->enable_disk_cache("./disk_cache/");
 
 	store->init_storage(GetParam().ip, GetParam().port, GetParam().user, GetParam().passwd);
-	store->reserve_block(batch, 5, 3);
+	store->set_insert_destination("default.sql_log");
 
 	std::thread([&store]() {
 		std::this_thread::sleep_for(100ms);

@@ -59,13 +59,13 @@ TEST_P(ch_cluster_insert_ut, load_balance) {
     constexpr auto commit_batch = batch / 10;
     store->set_batch_commit(batch / 10);
     store->set_timeout_commit(10000);
+    store->set_insert_destination("default.sql_log");
 
     store->init_storage(GetParam());
-    store->reserve_block(batch, 3, 3);
 
     constexpr size_t expect_count = batch;
     for (size_t i = 1; i <= batch; ++i) {
-        store->storage(std::make_unique<storage_context>(), "default.sql_log");
+        store->storage(std::make_unique<storage_context>());
         if (i % commit_batch == 0) {
             std::this_thread::sleep_for(500ms);
         }
@@ -98,9 +98,9 @@ TEST_P(ch_cluster_insert_ut, cluster_hot_rebuild) {
     constexpr auto commit_batch = batch / 10;
     store->set_batch_commit(batch / 10);
     store->set_timeout_commit(10000);
+    store->set_insert_destination("default.sql_log");
 
     store->init_storage(GetParam());
-    store->reserve_block(batch, 3, 3);
 
     // change priority
     auto new_info = std::vector<ch::cluster::ch_shard>{
@@ -119,7 +119,7 @@ TEST_P(ch_cluster_insert_ut, cluster_hot_rebuild) {
 
     constexpr size_t expect_count = batch;
     for (size_t i = 1; i <= batch; ++i) {
-        store->storage(std::make_unique<storage_context>(), "default.sql_log");
+        store->storage(std::make_unique<storage_context>());
         if (i % commit_batch == 0) {
             std::this_thread::sleep_for(500ms);
         }
@@ -133,13 +133,13 @@ TEST_P(ch_cluster_insert_ut, insert_performace) {
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>>>();
     store->set_batch_commit(batch);
     store->set_timeout_commit(10000);
+    store->set_insert_destination("default.sql_log");
 
-    store->init_storage(GetParam());
-    store->reserve_block(batch, 3, 3);
+    store->init_storage(GetParam()); 
 
     constexpr size_t expect_count = batch;
     for (size_t i = 1; i <= batch; ++i) {
-        store->storage(std::make_unique<storage_context>(), "default.sql_log");
+        store->storage(std::make_unique<storage_context>());
     }
     EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
 };
@@ -149,14 +149,14 @@ TEST_P(ch_cluster_insert_ut, batch_insert) {
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::shared_ptr<storage_context>>>();
     store->set_batch_commit(batch);
+    store->set_insert_destination("default.sql_log");
 
     store->init_storage(GetParam());
-    store->reserve_block(batch, 3, 3);
 
     constexpr size_t expect_count = batch;
     auto ptr = std::make_shared<storage_context>();
     for (size_t i = 0; i < batch; ++i) {
-        store->storage(ptr, "default.sql_log");
+        store->storage(ptr);
     }
 
     EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -168,14 +168,14 @@ TEST_P(ch_cluster_insert_ut, timeout_insert) {
         fast::faststorage<ch::ch_cluster_connection, std::shared_ptr<storage_context>>>();
     store->set_batch_commit(batch);
     store->set_timeout_commit(1000);
+    store->set_insert_destination("default.sql_log");
 
-    store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
+    store->init_storage(GetParam());  
 
     constexpr size_t expect_count = batch / 2;
     auto ptr = std::make_shared<storage_context>();
     for (size_t i = 0; i < expect_count; ++i) {
-        store->storage(ptr, "default.sql_log");
+        store->storage(ptr);
     }
 
     EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -186,9 +186,9 @@ TEST_P(ch_cluster_insert_ut, 4_thread_storage) {
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::shared_ptr<storage_context>>>();
     store->set_batch_commit(batch);
+    store->set_insert_destination("default.sql_log");
 
     store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
 
     static constexpr size_t expect_count = batch;
     for (size_t i = 0; i < 4; ++i) {
@@ -196,7 +196,7 @@ TEST_P(ch_cluster_insert_ut, 4_thread_storage) {
             constexpr size_t insert_count = expect_count / 4;
             auto ptr = std::make_shared<storage_context>();
             for (size_t i = 0; i < insert_count; ++i) {
-                store->storage(ptr, "default.sql_log");
+                store->storage(ptr);
             }
         }).detach();
     }
@@ -209,13 +209,13 @@ TEST_P(ch_cluster_insert_ut, 4_thread_insert) {
     auto store = std::make_shared<
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>, 4>>();
     store->set_batch_commit(batch);
-
+    store->set_insert_destination("default.sql_log");
+   
     store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
 
     constexpr size_t expect_count = batch * 4;
     for (size_t i = 0; i < expect_count; ++i) {
-        store->storage(std::make_unique<storage_context>(), "default.sql_log");
+        store->storage(std::make_unique<storage_context>());
     }
 
     EXPECT_EQ(expect_count, async_result(store, expect_count, 10s));
@@ -229,16 +229,16 @@ TEST_P(ch_cluster_insert_ut, 8thread_storage_and_8thread_insert) {
         std::unique_ptr<storage_context>, thread_count>>();
     store->set_batch_commit(batch);
     store->set_timeout_commit(3000);
-
+    store->set_insert_destination("default.sql_log");
+    
     store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
 
     static constexpr size_t expect_count = batch * thread_count;
     for (size_t i = 0; i < thread_count; ++i) {
         std::thread([&store]() {
             constexpr size_t insert_count = expect_count / thread_count;
             for (size_t i = 0; i < insert_count; ++i) {
-                store->storage(std::make_unique<storage_context>(), "default.sql_log");
+                store->storage(std::make_unique<storage_context>());
             }
         }).detach();
     }
@@ -252,17 +252,17 @@ TEST_P(ch_cluster_insert_ut, disk_cache_and_4thread_storage_insert) {
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>, 4>>();
     constexpr size_t commit_batch = batch / 2;
     store->set_batch_commit(commit_batch);
-    store->enable_disk_cache("./disk_cache/");
-
+    store->set_insert_destination("default.sql_log");
+    
     store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
+    store->enable_disk_cache("./disk_cache/");
 
     static constexpr size_t expect_count = batch * 4;
     for (size_t i = 0; i < 4; ++i) {
         std::thread([&store]() {
             constexpr size_t insert_count = expect_count / 4;
             for (size_t i = 0; i < insert_count; ++i) {
-                store->storage(std::make_unique<storage_context>(), "default.sql_log");
+                store->storage(std::make_unique<storage_context>());
             }
         }).detach();
     }
@@ -277,10 +277,10 @@ TEST_P(ch_cluster_insert_ut, disk_cache_and_disable) {
         fast::faststorage<ch::ch_cluster_connection, std::unique_ptr<storage_context>, 2>>();
     constexpr size_t commit_batch = batch / 2;
     store->set_batch_commit(commit_batch);
-    store->enable_disk_cache("./disk_cache/");
-
+    
     store->init_storage(GetParam());
-    store->reserve_block(batch, 5, 3);
+    store->set_insert_destination("default.sql_log");
+    store->enable_disk_cache("./disk_cache/");
 
     std::thread([&store]() {
         std::this_thread::sleep_for(100ms);
@@ -292,7 +292,7 @@ TEST_P(ch_cluster_insert_ut, disk_cache_and_disable) {
         std::thread([&store]() {
             constexpr size_t insert_count = expect_count / 4;
             for (size_t i = 0; i < insert_count; ++i) {
-                store->storage(std::make_unique<storage_context>(), "default.sql_log");
+                store->storage(std::make_unique<storage_context>());
             }
         }).detach();
     }
