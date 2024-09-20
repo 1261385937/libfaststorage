@@ -22,9 +22,6 @@ public:
 
 private:
 	std::unique_ptr<clickhouse::Client> client_;
-	std::atomic<size_t> count_ = 0;
-	std::atomic<size_t> row_ = 0;
-	std::atomic<size_t> column_ = 0;
 
 public:
 	ch_connection(const std::string& ip, uint16_t port, const std::string& user,
@@ -38,16 +35,10 @@ public:
 			.SetPingBeforeQuery(true)
 			.SetSendRetries(1)
 			.SetRetryTimeout(std::chrono::seconds(3))
-			.SetConnectionConnectTimeout(std::chrono::seconds(1))
-			.SetConnectionRecvTimeout(std::chrono::seconds(2))
-			.SetConnectionSendTimeout(std::chrono::seconds(3))))
+			.SetConnectionConnectTimeout(std::chrono::seconds(3))
+			.SetConnectionRecvTimeout(std::chrono::seconds(10))
+			.SetConnectionSendTimeout(std::chrono::seconds(10))))
 	{}
-
-	void reserve_block(size_t commit_count, size_t row, size_t column) {
-		count_ = commit_count;
-		row_ = row;
-		column_ = column;
-	}
 
 	auto& get_raw_conn() {
 		return client_;
@@ -109,7 +100,7 @@ private:
 		constexpr auto element_size = Type::args_size_t::value;
 		thread_local auto column_tup = std::apply([this](auto&&... args) {
 			return std::make_tuple(inner::type_mapping < std::decay_t<decltype(Type{}.*args) >> {}.
-				make_column(count_, row_, column_)...);
+				make_column(0, 0, 0)...);
 		}, address);
 
 		for_each_tuple([](auto index) {
@@ -131,7 +122,10 @@ private:
 
 		clickhouse::Block block;
 		for_each_tuple([&names, &block](auto index) {
-			block.AppendColumn(std::string(std::get<index>(names)), std::get<index>(column_tup));
+			//auto& col = std::get<index>(column_tup);
+			//if (col->Size()) {
+				block.AppendColumn(std::string(std::get<index>(names)), std::get<index>(column_tup));
+			//}
 		}, std::make_index_sequence<element_size>());
 		return block;
 	}

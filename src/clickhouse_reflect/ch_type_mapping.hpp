@@ -4,6 +4,7 @@
 #include "clickhouse/columns/numeric.h"
 #include "clickhouse/columns/string.h"
 #include "clickhouse/columns/date.h"
+#include "clickhouse/columns/uuid.h"
 #include "reflection/reflect_meta.hpp"
 #include "user_define_type.hpp"
 
@@ -132,6 +133,17 @@ struct type_mapping<date_time> {
 	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnDateTime>;
 	auto make_column(size_t count, size_t, size_t) {
 		auto col = std::make_shared<clickhouse::ColumnDateTime>();
+		col->Reserve(count);
+		return col;
+	}
+};
+
+template <>
+struct type_mapping<uuid> {
+	using ch_type = clickhouse::ColumnUUID;
+	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnUUID>;
+	auto make_column(size_t count, size_t, size_t) {
+		auto col = std::make_shared<clickhouse::ColumnUUID>();
 		col->Reserve(count);
 		return col;
 	}

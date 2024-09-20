@@ -8,9 +8,9 @@ struct ch_replica {
     std::string ip;
     uint16_t port = 9000;
     std::string user = "";
-    std::string passwd = ""; 
+    std::string passwd = "";
     uint32_t priority = 1; // higher priority with smaller number
-    int max_connect_failed = 100;
+    int max_connect_failed = 60;
 
     // If continuous failed times reach max_connect_failed, 
     // the replica node may be broken, will be removed

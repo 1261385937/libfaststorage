@@ -31,10 +31,6 @@ private:
     std::vector<shard_conn> shard_conns_;
     std::shared_mutex shard_conns_mtx_;
 
-    std::atomic<size_t> count_ = 0;
-    std::atomic<size_t> row_ = 0;
-    std::atomic<size_t> column_ = 0;
-
 public:
     /**
      * @brief Make the cluster connections
@@ -62,14 +58,16 @@ public:
                 throw std::logic_error("replicas can not be empty");
             }
             auto conn = make_shard_connection(shard);
-            if (conn != nullptr) {
-                shard_conn sc{};
-                sc.shard = std::move(shard);
-                sc.conn = std::move(conn);
-                sc.index = index;
-                temp.emplace_back(std::move(sc));
-                index++;
+            if (conn == nullptr) {
+                continue;
             }
+
+            shard_conn sc{};
+            sc.shard = std::move(shard);
+            sc.conn = std::move(conn);
+            sc.index = index;
+            temp.emplace_back(std::move(sc));
+            index++;
         }
         update_shard_disk_usage(temp);
 
@@ -77,12 +75,6 @@ public:
         shard_conns_ = std::move(temp);
         lock.unlock();
         cluster_version_++;
-    }
-
-    void reserve_block(size_t commit_count, size_t row, size_t column) {
-        count_ = commit_count;
-        row_ = row;
-        column_ = column;
     }
 
     template <typename DataType>
@@ -120,8 +112,8 @@ public:
                 continue;
             }
 
-            if (sc.shard.replicas.empty()) {
-                // If this shard has no replica node, remove the shard.  
+            // If this shard has no replica node, remove the shard.  
+            if (sc.shard.replicas.empty()) { 
                 auto it = std::find_if(now_shard_conns_.begin(), now_shard_conns_.end(),
                     [index = sc.index](const shard_conn& sc) { return index == sc.index; });
                 now_shard_conns_.erase(it);
@@ -163,7 +155,6 @@ private:
         for (auto it = shard.replicas.begin(); it != shard.replicas.end();) {
             try {
                 auto conn = std::make_shared<ch_connection>(it->ip, it->port, it->user, it->passwd);
-                conn->reserve_block(count_, row_, column_);
                 it->continuous_connect_failed = 0;
                 return conn;
             }
@@ -204,7 +195,7 @@ private:
                 shard.disk_usage = (space - free_space) * 1.0f / space;
             }
             catch (const std::exception& e) {
-                printf("check replica disk usage failed: %s\n", e.what());
+                printf("check shard disk usage failed: %s\n", e.what());
             }
         }
         std::sort(shard_conns.begin(), shard_conns.end(),
