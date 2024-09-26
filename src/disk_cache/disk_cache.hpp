@@ -17,26 +17,34 @@ namespace disk {
 
 template<typename T>
 concept sequence_container = requires (T t, std::size_t n) {
-	{ t.begin() } ->std::convertible_to<decltype(t.begin())>;
-	{ t.end() } ->std::convertible_to<decltype(t.end())>;
+	{ t.begin() };
+	{ t.end() };
 	{ t.resize(n) } ->std::same_as<void>;
 };
 
 template<typename T>
 concept not_sequence_container = !sequence_container<T>;
 
-template <typename T, typename U = void>
-struct has_size : std::false_type {};
-template <typename T>
-struct has_size<T, std::enable_if_t<std::is_member_function_pointer_v<decltype(&T::size)>>>
-	: std::true_type {};
-template <typename T>
-constexpr auto has_fun_size_v = has_size<T>::value;
+template<typename T>
+concept buffer = requires (T t) {
+	{ t.data() } ->std::convertible_to<const char*>;
+	{ t.size() } ->std::convertible_to<size_t>;
+};
+
+template<typename T, typename U>
+concept serialize = requires (T t, U u, const char* buf, std::size_t len) {
+	{ t.serialize(u) } ->buffer;
+	{t.deserialize<U>(buf, len) } ->std::convertible_to<U>;
+} || requires (T t, U u, const char* buf, std::size_t len) {
+	{ t.serialize(u) } ->buffer;
+	{ t.deserialize(buf, len) } ->std::convertible_to<U>;
+};
 
 constexpr size_t to_disk_count_threshold = 100000;
 constexpr size_t to_disk_times_threshold = 300;
 
 template <typename CacheType, typename Serialize = serialize::serializer>
+	requires serialize<Serialize, CacheType>
 class disk_cache {
 public:
 	using cache_type = std::deque<CacheType>;
@@ -200,8 +208,8 @@ private:
 				std::filesystem::remove(file_name);
 				// callback
 				try {
-					auto r =
-						serializer_.template deserialize<cache_type>(disk_buf.data(), disk_buf.length());
+					auto r = serializer_.template deserialize<cache_type>(
+						disk_buf.data(), disk_buf.length());
 					deserialize_count_ += r.size();
 					cb_(std::move(r));
 					// printf("deserialize count: %llu, this :%llu\n",

@@ -16,6 +16,17 @@ namespace inner {
 struct clickhouse_tag {};
 }  // namespace inner
 
+#define HAS_MEMBER(FUN)																		\
+template <typename T, class U = void>														\
+struct has_##FUN : std::false_type {};														\
+template <typename T>																		\
+struct has_##FUN<T, std::enable_if_t<std::is_member_function_pointer_v<decltype(&T::FUN)>>> \
+: std::true_type {};																		\
+template <class T>																			\
+constexpr bool has_##FUN##_v = has_##FUN<T>::value; 
+
+HAS_MEMBER(set_reusable);
+
 class ch_connection {
 public:
 	using engine_type = inner::clickhouse_tag;
@@ -46,25 +57,25 @@ public:
 
 	template <typename DataType>
 	bool insert(DataType&& data, const std::string& db_table) {
-		static_assert(reflection::is_sequence_std_container_v<DataType>,
-					  "clickhouse insert must be batch for high performance");
-
 		using value_type = typename std::decay_t<DataType>::value_type;
-		constexpr auto is_smartptr = reflection::is_std_smartptr_v<value_type>;
-		clickhouse::Block block;
+		using elem_type = typename value_type::element_type;
+		static_assert(reflection::is_sequence_std_container_v<DataType>,
+			"clickhouse insert must be batch for high performance");
+		static_assert(reflection::is_std_smartptr_v<value_type>,
+			"clickhouse insert must be batch for high performance");
+		static_assert(reflection::is_has_reflect_type_v<elem_type>, "not found reflect type");
 
-		if constexpr (is_smartptr) {
-			using type = typename value_type::element_type;
-			static_assert(reflection::is_has_reflect_type_v<type>, "not found reflect type");
-			block = gen_ch_block<type>(std::forward<DataType>(data));
+		clickhouse::Block block;
+		if constexpr (reflection::is_non_intrusive_reflection_v<elem_type>) {
+			using TT = decltype(reflection_reflect_member(std::declval<elem_type>()));
+			block = gen_block<TT, elem_type>(std::forward<DataType>(data));
 		}
 		else {
-			static_assert(reflection::is_has_reflect_type_v<value_type>, "not found reflect type");
-			block = gen_ch_block<value_type>(std::forward<DataType>(data));
+			block = gen_block<elem_type>(std::forward<DataType>(data));
 		}
 
+		//clickhouse detect network with SetPingBeforeQuery(true), if bad will reconnect.
 		try {
-			//clickhouse detect network with SetPingBeforeQuery(true), if bad will reconnect.
 			client_->Insert(db_table, block);
 			return true;
 		}
@@ -82,25 +93,35 @@ private:
 			auto& value = d.*std::get<index>(address);
 			auto& column_ptr = std::get<index>(tup);
 
-			using element_type = std::decay_t<decltype(value)>;
-			constexpr auto layer = reflection::nested_sequence_layer_v<element_type>;
-			if constexpr (layer == 0 || layer == 1 || layer == 2) {
-				column_ptr->Append(value);
+			auto dispatcher = [&column_ptr](auto&& val) {
+				using T = std::decay_t<decltype(val)>;
+				constexpr auto layer = reflection::nested_sequence_layer_v<T>;
+				if constexpr (layer == 0 || layer == 1 || layer == 2) {
+					column_ptr->Append(val);
+				}
+				else {
+					static_assert(reflection::always_false_v<T>, "sequence nest more than 2");
+				}
+			};
+
+			using type = std::decay_t<decltype(value)>;
+			if constexpr (reflection::is_std_smartptr_v<type>) {
+				dispatcher(*value);
 			}
 			else {
-				static_assert(reflection::always_false_v<element_type>, "sequence nest more than 2");
-			}
+				dispatcher(value);
+			}	
 		}, std::make_index_sequence<element_size>());
 	}
 
-	template <typename Type, typename DataType>
-	auto gen_ch_block(DataType&& data) {
+	template <typename Type, typename ReflectType = Type, typename DataType>
+	auto gen_block(DataType&& data) {
 		constexpr auto names = Type::elements_name();
 		constexpr auto address = Type::elements_address();
 		constexpr auto element_size = Type::args_size_t::value;
 		thread_local auto column_tup = std::apply([this](auto&&... args) {
-			return std::make_tuple(inner::type_mapping < std::decay_t<decltype(Type{}.*args) >> {}.
-				make_column(0, 0, 0)...);
+			return std::make_tuple(inner::type_mapping <
+				std::decay_t<decltype(ReflectType{}.*args) >> {}.make_column(0, 0, 0)...);
 		}, address);
 
 		for_each_tuple([](auto index) {
@@ -108,15 +129,12 @@ private:
 			column_ptr->Clear();
 		}, std::make_index_sequence<element_size>());
 
-		using value_type = typename std::decay_t<DataType>::value_type;
-		constexpr auto is_smartptr = reflection::is_std_smartptr_v<value_type>;
+		using elem_type = typename std::decay_t<DataType>::value_type::element_type;
 		constexpr auto is_rvalue = std::is_rvalue_reference_v<decltype(data)>;
 		for (auto& d : data) {
-			if constexpr (is_smartptr) {
-				convert_to_column<is_rvalue>(address, column_tup, *d);
-			}
-			else {
-				convert_to_column<is_rvalue>(address, column_tup, d);
+			convert_to_column<is_rvalue>(address, column_tup, *d);
+			if constexpr (has_set_reusable_v<elem_type>) {
+				d->set_reusable(true);
 			}
 		}
 

@@ -1,12 +1,15 @@
 #pragma once
 #include <string>
+#include <memory>
 #include "clickhouse/columns/array.h"
 #include "clickhouse/columns/numeric.h"
 #include "clickhouse/columns/string.h"
 #include "clickhouse/columns/date.h"
 #include "clickhouse/columns/uuid.h"
 #include "reflection/reflect_meta.hpp"
-#include "user_define_type.hpp"
+#ifndef USER_DEFINE_TYPE
+#include "inner_define_type.hpp"
+#endif
 
 namespace sqlcpp::ch::inner {
 
@@ -119,6 +122,17 @@ struct type_mapping<std::string> {
 };
 
 template <>
+struct type_mapping<std::shared_ptr<std::string>> {
+	using ch_type = clickhouse::ColumnString;
+	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnString>;
+	auto make_column(size_t count, size_t, size_t) {
+		auto col = std::make_shared<clickhouse::ColumnString>();
+		col->Reserve(count);
+		return col;
+	}
+};
+
+template <>
 struct type_mapping<std::string_view> {
 	using ch_type = clickhouse::ColumnString;
 	using ch_ptr_type = std::shared_ptr<clickhouse::ColumnString>;
@@ -127,6 +141,7 @@ struct type_mapping<std::string_view> {
 	}
 };
 
+#ifdef INNER_DEFINE_TYPE
 template <>
 struct type_mapping<date_time> {
 	using ch_type = clickhouse::ColumnDateTime;
@@ -148,6 +163,7 @@ struct type_mapping<uuid> {
 		return col;
 	}
 };
+#endif
 
 template <typename T>
 struct type_mapping<T, std::enable_if_t<reflection::nested_sequence_layer_v<T> == 1>> {

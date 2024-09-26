@@ -1,19 +1,20 @@
 #pragma once
-#include "meta_describe.hpp"
+#include "reflection/reflect_meta.hpp"
+#define INNER_DEFINE_TYPE
 
 namespace sqlcpp::ch {
 
 struct date_time {
-	std::time_t time = 0;
+	std::time_t timestamp = 0;
 
 	date_time() = default;
-	date_time(std::time_t t) : time(t) {}
+	date_time(std::time_t t) : timestamp(t) {}
 
 	operator std::time_t() {
-		return time;
+		return timestamp;
 	}
-	MSGPACK_DEFINE(time);
 };
+REFLECT_NON_INTRUSIVE(date_time, timestamp);
 
 struct uuid {
 	uint64_t high64 = 0;
@@ -25,8 +26,7 @@ struct uuid {
 	operator std::pair<uint64_t, uint64_t>() {
 		return std::pair{ high64, low64 };
 	}
-	
-	MSGPACK_DEFINE(high64, low64);
 };
+REFLECT_NON_INTRUSIVE(uuid, high64, low64);
 
 }  // namespace sqlcpp::ch
