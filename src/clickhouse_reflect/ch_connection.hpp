@@ -26,6 +26,7 @@ template <class T>																			\
 constexpr bool has_##FUN##_v = has_##FUN<T>::value; 
 
 HAS_MEMBER(set_reusable);
+HAS_MEMBER(clear);
 
 class ch_connection {
 public:
@@ -98,6 +99,12 @@ private:
 				constexpr auto layer = reflection::nested_sequence_layer_v<T>;
 				if constexpr (layer == 0 || layer == 1 || layer == 2) {
 					column_ptr->Append(val);
+					if constexpr (has_clear_v<T>) {
+						val.clear();
+					}
+					else {
+						val = {};
+					}
 				}
 				else {
 					static_assert(reflection::always_false_v<T>, "sequence nest more than 2");
