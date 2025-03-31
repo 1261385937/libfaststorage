@@ -34,7 +34,7 @@ concept buffer = requires (T t) {
 template<typename T, typename U>
 concept serialize = requires (T t, U u, const char* buf, std::size_t len) {
 	{ t.serialize(u) } ->buffer;
-	{t.deserialize<U>(buf, len) } ->std::convertible_to<U>;
+	{t.template deserialize<U>(buf, len) } ->std::convertible_to<U>;
 } || requires (T t, U u, const char* buf, std::size_t len) {
 	{ t.serialize(u) } ->buffer;
 	{ t.deserialize(buf, len) } ->std::convertible_to<U>;

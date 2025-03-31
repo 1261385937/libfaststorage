@@ -41,7 +41,9 @@ struct convert_template {
 		for_each_tuple([&o, &v, &address](auto index) {
 			auto& elem = v.*std::get<index>(address);
 			using elem_type = std::decay_t<decltype(elem)>;
-			elem = o.via.array.ptr[index].as<elem_type>();
+			if (!o.via.array.ptr[index].is_nil()) {
+				elem = o.via.array.ptr[index].template as<elem_type>();
+			}
 		}, std::make_index_sequence<element_size>());
 		return o;
 	}
